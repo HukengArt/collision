@@ -14,10 +14,11 @@ var ctx;
 var keys = [];
 var t_vel = 5;
 var grav = 1;
-var fric = undefined;
+var fric;
 
 var level;
 var ball;
+var box;
 
 
 document.addEventListener('DOMContentLoaded', setupCanvas);
@@ -42,16 +43,20 @@ function setupCanvas() {
     ball = new Ball([WIDTH/2, HEIGHT/2],
                     [Math.floor(Math.random() * 15) - 7, Math.floor(Math.random() * 15) - 7]);
     // testing table
-    level = new Level([[100,150,1],[200,50,1],[600,50,1], [700,150,1], [700,300,1], [600,400,1], [400, 450, 1], [200,400,1], [100,300,1]]);
+    level = new SolidElement([[100,150,1],[200,50,1],[600,50,1], [700,150,1], [700,300,1], [600,400,1], [400, 450, 1], [200,400,1], [100,300,1]], false);
+    box = new SolidElement([[550,150,3], [650,150,3], [650,300,3], [550,300,3]], true);
 }
 
 function update() {
-    //ctx.fillRect(0,0,WIDTH,HEIGHT);
+    // ctx.fillRect(0,0,WIDTH,HEIGHT);
     ctx.strokeStyle = 'white';
-    level.drawHbSolid();
-    ball.bounce(level.hb_solid);
+    ball.bounce(level.hb_solid, level.convex);
+    ball.bounce(box.hb_solid, box.convex);
     ball.move();
+
     ball.drawHbSolid();
+    level.drawHbSolid();
+    box.drawHbSolid();
 
     if (ball.pos[0] > WIDTH - ball.hb_solid_rad && ball.mo_vec[0] > 0 || ball.pos[0] < ball.hb_solid_rad && ball.mo_vec[0] < 0) {
         ball.mo_vec[0] *= -ball.elasticity;
@@ -77,6 +82,14 @@ class Ball {
     }
 
     move() {
+        // manage bounce lock
+        if (this.bounce_lock > 0) {
+          this.bounce_lock += 1;
+          if (this.bounce_lock > 3) {
+            this.bounce_lock = 0;
+          }
+        }
+
         // adjust speed to terminal velocity
         if (t_vel && Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) > t_vel) {
             this.mo_vec[0] = this.mo_vec[0] / Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * t_vel;
@@ -99,56 +112,37 @@ class Ball {
         }
     }
 
-    bounce(hitbox) {
-      for (let i = 0; i < hitbox.length; i++) {
-        let vec0 = [this.pos[0] - hitbox[i][0], this.pos[1] - hitbox[i][1]];
-        let vec1 = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0], hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
+    bounce(hitbox, convex) {
+      if (this.bounce_lock == 0) {
+        for (let i = 0; i < hitbox.length; i++) {
+          let vec0 = [this.pos[0] - hitbox[i][0], this.pos[1] - hitbox[i][1]];
+          let vec1 = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0], hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
 
-        if (Math.sqrt(Math.pow(vec0[0], 2) + Math.pow(vec0[1], 2)) <= Math.sqrt(Math.pow(vec1[0], 2) + Math.pow(vec1[1], 2)) &&
-            vecAngle2D(vec0, vec1) < Math.PI/2) {
+          if (Math.sqrt(Math.pow(vec0[0], 2) + Math.pow(vec0[1], 2)) <= Math.sqrt(Math.pow(vec1[0], 2) + Math.pow(vec1[1], 2)) &&
+              vecAngle2D(vec0, vec1) < Math.PI/2) {
 
-          let radians = vecAngle2D(vec0, vec1);
+            let radians = vecAngle2D(vec0, vec1);
 
-          if (this.bounce_lock > 0 && this.bounce_lock < 3) {
-            this.bounce_lock += 1;
-          } else { // Abprallen an KONKAVEN hitboxen
-            this.bounce_lock = 0;
             if (Math.sqrt(Math.pow(vec0[0], 2) + Math.pow(vec0[1], 2)) * Math.sin(radians) <= this.hb_solid_rad) {
                 ctx.strokeStyle = 'red';
 
                 let alpha = vecAngle2D(this.mo_vec, vec1);
 
-                if (alpha < Math.PI) {
-                  let x_new = (this.mo_vec[0]*Math.cos(2*alpha) - this.mo_vec[1]*Math.sin(2*alpha)) * this.elasticity;
-                  let y_new = (this.mo_vec[0]*Math.sin(2*alpha) + this.mo_vec[1]*Math.cos(2*alpha)) * this.elasticity;
+                if (convex) { // bounce off CONVEX hibtoxes
+                  let x_new = (this.mo_vec[0]*Math.cos(2*Math.PI - 2*alpha) - this.mo_vec[1]*Math.sin(2*Math.PI - 2*alpha)) * this.elasticity * hitbox[i][2];
+                  let y_new = (this.mo_vec[0]*Math.sin(2*Math.PI - 2*alpha) + this.mo_vec[1]*Math.cos(2*Math.PI - 2*alpha)) * this.elasticity * hitbox[i][2];
                   this.mo_vec = [x_new, y_new];
-                } else {
-                  let x_new = (this.mo_vec[0]*Math.cos(2*Math.PI - alpha) - this.mo_vec[1]*Math.sin(2*Math.PI - alpha)) * this.elasticity;
-                  let y_new = (this.mo_vec[0]*Math.sin(2*Math.PI - alpha) + this.mo_vec[1]*Math.cos(2*Math.PI - alpha)) * this.elasticity;
+                } else { // bounce off CONCAVE hibtoxes
+                  let x_new = (this.mo_vec[0]*Math.cos(2*alpha) - this.mo_vec[1]*Math.sin(2*alpha)) * this.elasticity * hitbox[i][2];
+                  let y_new = (this.mo_vec[0]*Math.sin(2*alpha) + this.mo_vec[1]*Math.cos(2*alpha)) * this.elasticity * hitbox[i][2];
                   this.mo_vec = [x_new, y_new];
                 }
-
                 this.bounce_lock = 1;
             }
           }
-            /* MAHNMAL WIDER DEN MITTERNACHTS-SPAGHETTICODE
-            let vec2;
-            if (vecAngle2D(vec0, vec1) > vecAngle2D(vec0, [-1 * vec1[0], -1 * vec1[1]])) {
-              vec2 = vec1;
-            } else {
-              vec2 = [-1 * vec1[0], -1 * vec1[1]];
-            }
-
-            let alpha = vecAngle2D(vec0, vec2);
-
-            let x_new = (this.mo_vec[0]*Math.cos(alpha) - this.mo_vec[1]*Math.sin(alpha)) * this.elasticity;
-            let y_new = (this.mo_vec[0]*Math.sin(alpha) + this.mo_vec[1]*Math.cos(alpha)) * this.elasticity;
-
-            this.mo_vec = [x_new, y_new];
-            */
-          }
         }
       }
+    }
 
     drawHbSolid() {
         ctx.beginPath();
@@ -160,9 +154,10 @@ class Ball {
     }
 }
 
-class Level {
-    constructor(outline) {
+class SolidElement {
+    constructor(outline, convex) {
         this.hb_solid = outline;
+        this.convex = convex;
     }
 
     drawHbSolid() {
@@ -174,3 +169,4 @@ class Level {
         ctx.stroke();
     }
 }
+
