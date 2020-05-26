@@ -94,17 +94,17 @@ function setup() {
                   [[-15,0,1],
                    [0,-15,1],
                    [60,-10,1],
-                   [70,0,1],
-                   [60,10,1],
+                   [70,0,-1],
+                   [60,10,-1],
                    [0,15,1]],
                   Math.PI*30/180, Math.PI/2, 70, true),
       new Flipper([330,700],
-                  [[-60,10,1],
+                  [[-60,10,-1],
                    [-70,0,1],
                    [-60,-10,1],
                    [0,-15,1],
                    [15,0,1],
-                   [0,15,1]],
+                   [0,15,-1]],
                    Math.PI*30/180, Math.PI/2, 74, false)
     ];
 }
@@ -121,12 +121,16 @@ function update() {
     }
 
     for (let i = 0; i < solid_elements.length; i++) {
-      ball.bounce(solid_elements[i].hb_solid, solid_elements[i].convex);
+      if (ball.bounce(solid_elements[i].hb_solid, solid_elements[i].convex)) {
+        break;
+      }
       solid_elements[i].drawHbSolid();
     }
 
     for (let i = 0; i < flippers.length; i++) {
-      ball.bounce(flippers[i].hb_solid, true);
+      if (ball.bounce(flippers[i].hb_solid, true)) {
+        break;
+      }
     }
 
     ball.move();
@@ -141,6 +145,14 @@ function update() {
 function vecAngle2D(vec_a, vec_b) {
     return Math.acos((vec_a[0] * vec_b[0] + vec_a[1] * vec_b[1]) / (Math.sqrt(Math.pow(vec_a[0], 2) + Math.pow(vec_a[1], 2)) * Math.sqrt(Math.pow(vec_b[0], 2) + Math.pow(vec_b[1], 2))));
   }
+
+function vecLen2D(vec) {
+  return Math.sqrt(Math.pow(vec[0],2) + Math.pow(vec[1],2));
+}
+
+function vecRotate3D(vec, angle) {
+
+}
 
 class Ball {
     constructor(pos, mo_vec) {
@@ -164,8 +176,8 @@ class Ball {
 
         // adjust speed to terminal velocity
         if (t_vel && Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) > t_vel) {
-            this.mo_vec[0] = this.mo_vec[0] / Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * t_vel;
-            this.mo_vec[1] = this.mo_vec[1] / Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * t_vel;
+            this.mo_vec[0] = this.mo_vec[0] / vecLen2D(this.mo_vec) * t_vel;
+            this.mo_vec[1] = this.mo_vec[1] / vecLen2D(this.mo_vec) * t_vel;
         }
 
         // move orb
@@ -192,13 +204,11 @@ class Ball {
           let vec_b = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0],
                       hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
 
-          if (Math.sqrt(Math.pow(vec_a[0], 2) + Math.pow(vec_a[1], 2)) <= Math.sqrt(Math.pow(vec_b[0], 2) + Math.pow(vec_b[1], 2)) &&
-              vecAngle2D(vec_a, vec_b) < Math.PI/2) {
+          let radians = vecAngle2D(vec_a, vec_b);
 
-            let radians = vecAngle2D(vec_a, vec_b);
+          if (vecLen2D(vec_a)  <= vecLen2D(vec_b) + this.hb_solid_rad && radians < Math.PI/2) {
 
-            if (Math.sqrt(Math.pow(vec_a[0], 2) + Math.pow(vec_a[1], 2)) * Math.sin(radians) <= this.hb_solid_rad) {
-                ctx.strokeStyle = 'red';
+            if (vecLen2D(vec_a) * Math.sin(radians) <= this.hb_solid_rad) {
 
                 let alpha = vecAngle2D(this.mo_vec, vec_b);
 
@@ -214,17 +224,19 @@ class Ball {
                   }
                 } else {
                   if (convex) { // perpendicular bounce off CONVEX hitbox
-                    let x_new = vec_b[1] / Math.sqrt(Math.pow(vec_b[0],2) + Math.pow(vec_b[1],2)) * Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * Math.abs(hitbox[i][2]);
-                    let y_new = vec_b[0] / Math.sqrt(Math.pow(vec_b[0],2) + Math.pow(vec_b[1],2)) * Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * hitbox[i][2];
+                    let x_new = vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]);
+                    let y_new = vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2];
                     this.mo_vec = [x_new, y_new];
                   } else { // perpendicular bounce off CONCAVE hitbox
-                    let x_new = vec_b[1] / Math.sqrt(Math.pow(vec_b[0],2) + Math.pow(vec_b[1],2)) * Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * hitbox[i][2];
-                    let y_new = vec_b[0] / Math.sqrt(Math.pow(vec_b[0],2) + Math.pow(vec_b[1],2)) * Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) * Math.abs(hitbox[i][2]);
+                    let x_new = vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2];
+                    let y_new = vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]);
                     this.mo_vec = [x_new, y_new];
                   }
                 }
 
+                ctx.strokeStyle = 'red';
                 this.bounce_lock = 1;
+                return true;
             }
           }
         }
