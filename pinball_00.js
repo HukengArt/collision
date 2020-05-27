@@ -13,6 +13,7 @@ var canvas;
 var ctx;
 var keys = [];
 var t_vel = 9;
+var m_vel = 1;
 var grav = 1;
 var fric;
 
@@ -49,45 +50,49 @@ function setup() {
                         [450,150,1],
                         [475,250,1],
                         [450,350,1],
-                        [425,400,1],
+                        [425,390,1],
                         [425,650,1],
                         [330,700,1],
                         [330,875,1],
+                        // [500,875,1],
+                        // [500,0,1],
+                        // [0,0,1],
+                        // [0,875,1],
                         [170,875,1],
                         [170,700,1],
                         [75,650,1],
-                        [75,400,1],
+                        [75,390,1],
                         [50,350,1],
                         [25,250,1],
                         [50,150,1]], false),
       // side bumpers
       new SolidElement([[150,450,1],
-                        [175,600,1],
-                        [120,575,1],
+                        [160,600,1],
+                        [120,580,1],
                         [120,460,1]], true),
-      new SolidElement([[325,600,1],
+      new SolidElement([[340,600,1],
                         [350,450,1],
                         [380,460,1],
-                        [380,575,1]], true),
+                        [380,580,1]], true),
       // round bumpers
-      new SolidElement([[250,75,-2],
-                        [300,100,-2],
-                        [300,150,-2],
-                        [250,175,-2],
-                        [200,150,-2],
-                        [200,100,-2]], true),
-      new SolidElement([[150,225,-2],
-                        [200,250,-2],
-                        [200,300,-2],
-                        [150,325,-2],
-                        [100,300,-2],
-                        [100,250,-2]], true),
-      new SolidElement([[350,225,-2],
-                        [400,250,-2],
-                        [400,300,-2],
-                        [350,325,-2],
-                        [300,300,-2],
-                        [300,250,-2]], true)
+      new SolidElement([[250,75,-1.3],
+                        [300,100,-1.3],
+                        [300,150,-1.3],
+                        [250,175,-1.3],
+                        [200,150,-1.3],
+                        [200,100,-1.3]], true),
+      new SolidElement([[150,225,-1.3],
+                        [200,250,-1.3],
+                        [200,300,-1.3],
+                        [150,325,-1.3],
+                        [100,300,-1.3],
+                        [100,250,-1.3]], true),
+      new SolidElement([[350,225,-1.3],
+                        [400,250,-1.3],
+                        [400,300,-1.3],
+                        [350,325,-1.3],
+                        [300,300,-1.3],
+                        [300,250,-1.3]], true)
     ];
     flippers = [
       new Flipper([170,700],
@@ -99,12 +104,12 @@ function setup() {
                    [0,15,1]],
                   Math.PI*30/180, Math.PI/2, 70, true),
       new Flipper([330,700],
-                  [[-60,10,-1],
-                   [-70,0,1],
+                  [[-70,0,1],
                    [-60,-10,1],
                    [0,-15,1],
                    [15,0,1],
-                   [0,15,-1]],
+                   [0,15,-1],
+                   [-60,10,-1]],
                    Math.PI*30/180, Math.PI/2, 74, false)
     ];
 }
@@ -150,8 +155,9 @@ function vecLen2D(vec) {
   return Math.sqrt(Math.pow(vec[0],2) + Math.pow(vec[1],2));
 }
 
-function vecRotate3D(vec, angle) {
-
+function vecRotate2D(vec, angle) {
+  return [vec[0] * Math.cos(angle) - vec[1] * Math.sin(angle),
+          vec[0] * Math.sin(angle) + vec[1] * Math.cos(angle)];
 }
 
 class Ball {
@@ -175,7 +181,7 @@ class Ball {
         }
 
         // adjust speed to terminal velocity
-        if (t_vel && Math.sqrt(Math.pow(this.mo_vec[0],2) + Math.pow(this.mo_vec[1],2)) > t_vel) {
+        if (t_vel && vecLen2D(this.mo_vec) > t_vel) {
             this.mo_vec[0] = this.mo_vec[0] / vecLen2D(this.mo_vec) * t_vel;
             this.mo_vec[1] = this.mo_vec[1] / vecLen2D(this.mo_vec) * t_vel;
         }
@@ -198,46 +204,46 @@ class Ball {
 
     bounce(hitbox, convex) {
       if (this.bounce_lock == 0) {
+
         for (let i = 0; i < hitbox.length; i++) {
           let vec_a = [this.pos[0] - hitbox[i][0],
                       this.pos[1] - hitbox[i][1]];
           let vec_b = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0],
                       hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
+          let vec_c = [this.pos[0] - hitbox[(i + 1) % hitbox.length][0],
+                      this.pos[1] - hitbox[(i + 1) % hitbox.length][1]];
 
-          let radians = vecAngle2D(vec_a, vec_b);
+          let radians_a = vecAngle2D(vec_a, vec_b);
+          let radians_b = vecAngle2D(vec_b, vec_c);
 
-          if (vecLen2D(vec_a)  <= vecLen2D(vec_b) + this.hb_solid_rad && radians < Math.PI/2) {
+          if (radians_a <= Math.PI * 0.5 &&
+              radians_b >= Math.PI * 0.5 &&
+              vecLen2D(vec_a) * Math.sin(radians_a) <= this.hb_solid_rad) {
 
-            if (vecLen2D(vec_a) * Math.sin(radians) <= this.hb_solid_rad) {
+              let alpha = vecAngle2D(this.mo_vec, vec_b);
 
-                let alpha = vecAngle2D(this.mo_vec, vec_b);
-
-                if (hitbox[i][2] > 0) {
-                  if (convex) { // bounce off CONVEX hibtoxes
-                    let x_new = (this.mo_vec[0]*Math.cos(2*Math.PI - 2*alpha) - this.mo_vec[1]*Math.sin(2*Math.PI - 2*alpha)) * this.elasticity * hitbox[i][2];
-                    let y_new = (this.mo_vec[0]*Math.sin(2*Math.PI - 2*alpha) + this.mo_vec[1]*Math.cos(2*Math.PI - 2*alpha)) * this.elasticity * hitbox[i][2];
-                    this.mo_vec = [x_new, y_new];
-                  } else { // bounce off CONCAVE hibtoxes
-                    let x_new = (this.mo_vec[0]*Math.cos(2*alpha) - this.mo_vec[1]*Math.sin(2*alpha)) * this.elasticity * hitbox[i][2];
-                    let y_new = (this.mo_vec[0]*Math.sin(2*alpha) + this.mo_vec[1]*Math.cos(2*alpha)) * this.elasticity * hitbox[i][2];
-                    this.mo_vec = [x_new, y_new];
-                  }
-                } else {
-                  if (convex) { // perpendicular bounce off CONVEX hitbox
-                    let x_new = vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]);
-                    let y_new = vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2];
-                    this.mo_vec = [x_new, y_new];
-                  } else { // perpendicular bounce off CONCAVE hitbox
-                    let x_new = vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2];
-                    let y_new = vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]);
-                    this.mo_vec = [x_new, y_new];
-                  }
+              if (hitbox[i][2] > 0) {
+                if (convex && vecAngle2D(this.mo_vec, [-vec_b[1], vec_b[0]]) <= Math.PI) { // bounce off CONVEX hibtoxes
+                  let mo_vec_new = vecRotate2D(this.mo_vec, 2 * Math.PI - 2 * alpha);
+                  this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
+                                 mo_vec_new[1] * this.elasticity * hitbox[i][2]];
+                } else { // bounce off CONCAVE hibtoxes
+                  let mo_vec_new = vecRotate2D(this.mo_vec, 2 * alpha);
+                  this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
+                                 mo_vec_new[1] * this.elasticity * hitbox[i][2]];
                 }
-
-                ctx.strokeStyle = 'red';
-                this.bounce_lock = 1;
-                return true;
-            }
+              } else {
+                if (convex && vecAngle2D(this.mo_vec, [-vec_b[1], vec_b[0]]) <= Math.PI) { // perpendicular bounce off CONVEX hitbox
+                  this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]),
+                                 vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2]];
+                } else { // perpendicular bounce off CONCAVE hitbox
+                  this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2],
+                                 vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2])];
+                }
+              }
+              ctx.strokeStyle = 'red';
+              this.bounce_lock = 1;
+              return true;
           }
         }
       }
@@ -265,15 +271,13 @@ class Flipper {
       this.hb_ghost = outline;
       if (this.ccw) {
         for (let i = 0; i < this.hb_ghost.length; i++) {
-          let x_new = this.hb_ghost[i][0] * Math.cos(this.min_angle) - this.hb_ghost[i][1] * Math.sin(this.min_angle);
-          let y_new = this.hb_ghost[i][0] * Math.sin(this.min_angle) + this.hb_ghost[i][1] * Math.cos(this.min_angle);
-          this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+          let new_point = vecRotate2D(this.hb_ghost[i], this.min_angle);
+          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
         }
       } else {
         for (let i = 0; i < this.hb_ghost.length; i++) {
-          let x_new = this.hb_ghost[i][0] * Math.cos(2*Math.PI - this.min_angle) - this.hb_ghost[i][1] * Math.sin(2*Math.PI - this.min_angle);
-          let y_new = this.hb_ghost[i][0] * Math.sin(2*Math.PI - this.min_angle) + this.hb_ghost[i][1] * Math.cos(2*Math.PI - this.min_angle);
-          this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+          let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.min_angle);
+          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
         }
       }
 
@@ -291,16 +295,28 @@ class Flipper {
       if (keys[this.key_code]) {
         this.active = true;
         if (this.angle < this.max_angle) {
+          this.hb_ghost[0][2] = -6;
           this.hb_ghost[1][2] = -6;
           this.hb_ghost[2][2] = -6;
+          this.hb_ghost[3][2] = 0;
+          this.hb_ghost[4][2] = 0;
+          this.hb_ghost[5][2] = 0;
         } else {
+          this.hb_ghost[0][2] = 1;
           this.hb_ghost[1][2] = 1;
           this.hb_ghost[2][2] = 1;
+          this.hb_ghost[3][2] = 1;
+          this.hb_ghost[4][2] = 1;
+          this.hb_ghost[5][2] = 1;
         }
       } else {
         this.active = false;
+        this.hb_ghost[0][2] = 1;
         this.hb_ghost[1][2] = 1;
         this.hb_ghost[2][2] = 1;
+        this.hb_ghost[3][2] = 1;
+        this.hb_ghost[4][2] = 1;
+        this.hb_ghost[5][2] = 1;
       }
     }
 
@@ -310,16 +326,14 @@ class Flipper {
         if (this.angle <= this.max_angle) {
           if (this.ccw) {
             for (let i = 0; i < this.hb_ghost.length; i++) {
-              let x_new = this.hb_ghost[i][0] * Math.cos(2*Math.PI - this.angular_speed) - this.hb_ghost[i][1] * Math.sin(2*Math.PI - this.angular_speed);
-              let y_new = this.hb_ghost[i][0] * Math.sin(2*Math.PI - this.angular_speed) + this.hb_ghost[i][1] * Math.cos(2*Math.PI - this.angular_speed);
-              this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+              let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
+              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
             }
             this.angle += this.angular_speed;
           } else {
             for (let i = 0; i < this.hb_ghost.length; i++) {
-              let x_new = this.hb_ghost[i][0] * Math.cos(this.angular_speed) - this.hb_ghost[i][1] * Math.sin(this.angular_speed);
-              let y_new = this.hb_ghost[i][0] * Math.sin(this.angular_speed) + this.hb_ghost[i][1] * Math.cos(this.angular_speed);
-              this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+              let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
+              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
             }
             this.angle += this.angular_speed;
           }
@@ -327,16 +341,14 @@ class Flipper {
       } else if (this.angle > 0) {
         if (this.ccw) {
           for (let i = 0; i < this.hb_ghost.length; i++) {
-            let x_new = this.hb_ghost[i][0] * Math.cos(this.angular_speed) - this.hb_ghost[i][1] * Math.sin(this.angular_speed);
-            let y_new = this.hb_ghost[i][0] * Math.sin(this.angular_speed) + this.hb_ghost[i][1] * Math.cos(this.angular_speed);
-            this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+            let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
+            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
           }
           this.angle -= this.angular_speed;
         } else {
           for (let i = 0; i < this.hb_ghost.length; i++) {
-            let x_new = this.hb_ghost[i][0] * Math.cos(2*Math.PI - this.angular_speed) - this.hb_ghost[i][1] * Math.sin(2*Math.PI - this.angular_speed);
-            let y_new = this.hb_ghost[i][0] * Math.sin(2*Math.PI - this.angular_speed) + this.hb_ghost[i][1] * Math.cos(2*Math.PI - this.angular_speed);
-            this.hb_ghost[i] = [x_new, y_new, this.hb_ghost[i][2]];
+            let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
+            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
           }
           this.angle -= this.angular_speed;
         }
