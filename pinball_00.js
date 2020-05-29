@@ -13,7 +13,6 @@ var canvas;
 var ctx;
 var keys = [];
 var t_vel = 9;
-var m_vel = 1;
 var grav = 1;
 var fric;
 
@@ -44,55 +43,55 @@ function setup() {
     ball = new Ball([WIDTH/2, HEIGHT/2],
                     [Math.floor(Math.random() * 15) - 7, Math.floor(Math.random() * 15) - 7]);
     solid_elements = [
-      new SolidElement([[150,50,1],
-                        [250,25,1],
-                        [350,50,1],
-                        [450,150,1],
-                        [475,250,1],
-                        [450,350,1],
-                        [425,390,1],
-                        [425,650,1],
-                        [330,700,1],
-                        [330,875,1],
-                        // [500,875,1],
-                        // [500,0,1],
-                        // [0,0,1],
-                        // [0,875,1],
-                        [170,875,1],
-                        [170,700,1],
-                        [75,650,1],
-                        [75,390,1],
-                        [50,350,1],
+      new SolidElement([[50,150,1],
                         [25,250,1],
-                        [50,150,1]], false),
+                        [50,350,1],
+                        [75,390,1],
+                        [75,650,1],
+                        [170,700,1],
+                        [170,875,1],
+                        // [0,875,1],
+                        // [0,0,1],
+                        // [500,0,1],
+                        // [500,875,1],
+                        [330,875,1],
+                        [330,700,1],
+                        [425,650,1],
+                        [425,390,1],
+                        [450,350,1],
+                        [475,250,1],
+                        [450,150,1],
+                        [350,50,1],
+                        [250,25,1]]),
+
       // side bumpers
       new SolidElement([[150,450,1],
                         [160,600,1],
                         [120,580,1],
-                        [120,460,1]], true),
+                        [120,460,1]]),
       new SolidElement([[340,600,1],
                         [350,450,1],
                         [380,460,1],
-                        [380,580,1]], true),
+                        [380,580,1]]),
       // round bumpers
-      new SolidElement([[250,75,-1.3],
-                        [300,100,-1.3],
-                        [300,150,-1.3],
-                        [250,175,-1.3],
-                        [200,150,-1.3],
-                        [200,100,-1.3]], true),
-      new SolidElement([[150,225,-1.3],
-                        [200,250,-1.3],
-                        [200,300,-1.3],
-                        [150,325,-1.3],
-                        [100,300,-1.3],
-                        [100,250,-1.3]], true),
-      new SolidElement([[350,225,-1.3],
-                        [400,250,-1.3],
-                        [400,300,-1.3],
-                        [350,325,-1.3],
-                        [300,300,-1.3],
-                        [300,250,-1.3]], true)
+      // new SolidElement([[250,75,-1.3],
+      //                   [300,100,-1.3],
+      //                   [300,150,-1.3],
+      //                   [250,175,-1.3],
+      //                   [200,150,-1.3],
+      //                   [200,100,-1.3]], true),
+      // new SolidElement([[150,225,-1.3],
+      //                   [200,250,-1.3],
+      //                   [200,300,-1.3],
+      //                   [150,325,-1.3],
+      //                   [100,300,-1.3],
+      //                   [100,250,-1.3]], true),
+      // new SolidElement([[350,225,-1.3],
+      //                   [400,250,-1.3],
+      //                   [400,300,-1.3],
+      //                   [350,325,-1.3],
+      //                   [300,300,-1.3],
+      //                   [300,250,-1.3]], true)
     ];
     flippers = [
       new Flipper([170,700],
@@ -125,17 +124,17 @@ function update() {
       flippers[i].drawHbSolid();
     }
 
+    for (let i = 0; i < flippers.length; i++) {
+      if (ball.bounce(flippers[i].hb_solid, true)) {
+        break;
+      }
+    }
+
     for (let i = 0; i < solid_elements.length; i++) {
       if (ball.bounce(solid_elements[i].hb_solid, solid_elements[i].convex)) {
         break;
       }
       solid_elements[i].drawHbSolid();
-    }
-
-    for (let i = 0; i < flippers.length; i++) {
-      if (ball.bounce(flippers[i].hb_solid, true)) {
-        break;
-      }
     }
 
     ball.move();
@@ -202,7 +201,7 @@ class Ball {
         }
     }
 
-    bounce(hitbox, convex) {
+    bounce(hitbox) {
       if (this.bounce_lock == 0) {
 
         for (let i = 0; i < hitbox.length; i++) {
@@ -210,36 +209,23 @@ class Ball {
                       this.pos[1] - hitbox[i][1]];
           let vec_b = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0],
                       hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
-          let vec_c = [this.pos[0] - hitbox[(i + 1) % hitbox.length][0],
-                      this.pos[1] - hitbox[(i + 1) % hitbox.length][1]];
 
           let radians_a = vecAngle2D(vec_a, vec_b);
-          let radians_b = vecAngle2D(vec_b, vec_c);
 
           if (radians_a <= Math.PI * 0.5 &&
-              radians_b >= Math.PI * 0.5 &&
-              vecLen2D(vec_a) * Math.sin(radians_a) <= this.hb_solid_rad) {
+              vecLen2D(vec_a) <= vecLen2D(vec_b) &&
+              vecLen2D(vec_a) * Math.sin(radians_a) <= this.hb_solid_rad &&
+              vecAngle2D(this.mo_vec, [-vec_b[1],vec_b[0]]) <= Math.PI * 0.5) {
 
               let alpha = vecAngle2D(this.mo_vec, vec_b);
 
               if (hitbox[i][2] > 0) {
-                if (convex && vecAngle2D(this.mo_vec, [-vec_b[1], vec_b[0]]) <= Math.PI) { // bounce off CONVEX hibtoxes
-                  let mo_vec_new = vecRotate2D(this.mo_vec, 2 * Math.PI - 2 * alpha);
-                  this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
-                                 mo_vec_new[1] * this.elasticity * hitbox[i][2]];
-                } else { // bounce off CONCAVE hibtoxes
-                  let mo_vec_new = vecRotate2D(this.mo_vec, 2 * alpha);
-                  this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
-                                 mo_vec_new[1] * this.elasticity * hitbox[i][2]];
-                }
+                let mo_vec_new = vecRotate2D(this.mo_vec, 2 * Math.PI - 2 * alpha);
+                this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
+                               mo_vec_new[1] * this.elasticity * hitbox[i][2]];
               } else {
-                if (convex && vecAngle2D(this.mo_vec, [-vec_b[1], vec_b[0]]) <= Math.PI) { // perpendicular bounce off CONVEX hitbox
-                  this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]),
-                                 vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2]];
-                } else { // perpendicular bounce off CONCAVE hitbox
-                  this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2],
-                                 vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2])];
-                }
+                this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]),
+                               vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2]];
               }
               ctx.strokeStyle = 'red';
               this.bounce_lock = 1;
@@ -298,25 +284,16 @@ class Flipper {
           this.hb_ghost[0][2] = -6;
           this.hb_ghost[1][2] = -6;
           this.hb_ghost[2][2] = -6;
-          this.hb_ghost[3][2] = 0;
-          this.hb_ghost[4][2] = 0;
-          this.hb_ghost[5][2] = 0;
         } else {
           this.hb_ghost[0][2] = 1;
           this.hb_ghost[1][2] = 1;
           this.hb_ghost[2][2] = 1;
-          this.hb_ghost[3][2] = 1;
-          this.hb_ghost[4][2] = 1;
-          this.hb_ghost[5][2] = 1;
         }
       } else {
         this.active = false;
         this.hb_ghost[0][2] = 1;
         this.hb_ghost[1][2] = 1;
         this.hb_ghost[2][2] = 1;
-        this.hb_ghost[3][2] = 1;
-        this.hb_ghost[4][2] = 1;
-        this.hb_ghost[5][2] = 1;
       }
     }
 
@@ -371,9 +348,8 @@ class Flipper {
 }
 
 class SolidElement {
-    constructor(outline, convex) {
+    constructor(outline) {
         this.hb_solid = outline;
-        this.convex = convex;
     }
 
     drawHbSolid() {
