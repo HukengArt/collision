@@ -1,3 +1,4 @@
+
 //****various jshint configs****
 // jshint esversion: 8
 // jshint browser: true
@@ -169,4 +170,3 @@ class SolidElement {
         ctx.stroke();
     }
 }
-
