@@ -12,6 +12,9 @@ var canvasHeight = 500;
 var FPS = 60;
 var keys = [];
 
+var player;
+var level;
+
 document.addEventListener('DOMContentLoaded', setupCanvas);
 setInterval(update, 1000/FPS);
 
@@ -50,7 +53,7 @@ function vecAngle2D(vec0, vec1) {
   }
 
 function polygonCollision(list0, list1) {
-  
+
     for (let i = 0; i < list0.length; i++) {
         for (let j = 0; j < list1.length; j++) {
             let line0 = [list0[i], list0[(i+1) % list0.length]];
