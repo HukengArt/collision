@@ -156,8 +156,11 @@ function vecLen2D(vec) {
 
 function vecRotate2D(vec, angle) {
   // rotate a 2D vector or point by angle (in radians) around zero
-  return [vec[0] * Math.cos(angle) - vec[1] * Math.sin(angle),
-          vec[0] * Math.sin(angle) + vec[1] * Math.cos(angle)];
+  let new_x = vec[0] * Math.cos(angle) - vec[1] * Math.sin(angle);
+  let new_y = vec[0] * Math.sin(angle) + vec[1] * Math.cos(angle);
+  vec[0] = new_x;
+  vec[1] = new_y;
+  return vec;
 }
 
 class Ball {
@@ -251,22 +254,17 @@ class Flipper {
       this.max_angle = max_angle;
       this.ccw = ccw;
 
-      this.hb_ghost = outline;
+      this.hb_solid = outline;
       if (this.ccw) { // adjust hb_ghost to actual starting position
-        for (let i = 0; i < this.hb_ghost.length; i++) {
-          let new_point = vecRotate2D(this.hb_ghost[i], this.min_angle);
-          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+        for (let i = 0; i < this.hb_solid.length; i++) {
+          let new_point = vecRotate2D(this.hb_solid[i], this.min_angle);
+          this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
         }
       } else {
-        for (let i = 0; i < this.hb_ghost.length; i++) {
-          let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.min_angle);
-          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+        for (let i = 0; i < this.hb_solid.length; i++) {
+          let new_point = vecRotate2D(this.hb_solid[i], 2*Math.PI - this.min_angle);
+          this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
         }
-      }
-
-      this.hb_solid = [];
-      for (let i = 0; i < this.hb_ghost.length; i++) { // hb_solid is hb_ghost + pivot
-        this.hb_solid.push([this.hb_ghost[i][0] + this.pivot[0], this.hb_ghost[i][1] + this.pivot[1], this.hb_ghost[2]]);
       }
 
       this.active = false;
@@ -277,19 +275,28 @@ class Flipper {
       if (keys[this.key_code]) {
         this.active = true; // flipper moves up or rests in max_angle position
         if (this.angle < this.max_angle) {
-          this.hb_ghost[0][2] = -6;
-          this.hb_ghost[1][2] = -6;
-          this.hb_ghost[2][2] = -6;
+          this.hb_solid[0][2] = -10;
+          this.hb_solid[1][2] = -10;
+          this.hb_solid[2][2] = -10;
+          this.hb_solid[3][2] = 0;
+          this.hb_solid[5][2] = 0;
+          this.hb_solid[5][2] = 0;
         } else {
-          this.hb_ghost[0][2] = 1;
-          this.hb_ghost[1][2] = 1;
-          this.hb_ghost[2][2] = 1;
+          this.hb_solid[0][2] = 1;
+          this.hb_solid[1][2] = 1;
+          this.hb_solid[2][2] = 1;
+          this.hb_solid[3][2] = 1;
+          this.hb_solid[5][2] = 1;
+          this.hb_solid[5][2] = 1;
         }
       } else {
         this.active = false; // flipper moves down or rests in min_angle position
-        this.hb_ghost[0][2] = 1;
-        this.hb_ghost[1][2] = 1;
-        this.hb_ghost[2][2] = 1;
+        this.hb_solid[0][2] = 1;
+        this.hb_solid[1][2] = 1;
+        this.hb_solid[2][2] = 1;
+        this.hb_solid[3][2] = 1;
+        this.hb_solid[5][2] = 1;
+        this.hb_solid[5][2] = 1;
       }
     }
 
@@ -298,37 +305,33 @@ class Flipper {
       if (this.active) {
         if (this.angle <= this.max_angle) { // flipper moves up
           if (this.ccw) {
-            for (let i = 0; i < this.hb_ghost.length; i++) {
-              let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
-              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+            for (let i = 0; i < this.hb_solid.length; i++) {
+              let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
+              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
             }
             this.angle += this.angular_speed;
           } else {
-            for (let i = 0; i < this.hb_ghost.length; i++) {
-              let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
-              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+            for (let i = 0; i < this.hb_solid.length; i++) {
+              let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
+              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
             }
             this.angle += this.angular_speed;
           }
         }
       } else if (this.angle > 0) { // flipper moves down
         if (this.ccw) {
-          for (let i = 0; i < this.hb_ghost.length; i++) {
-            let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
-            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+          for (let i = 0; i < this.hb_solid.length; i++) {
+            let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
+            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
           }
           this.angle -= this.angular_speed;
         } else {
-          for (let i = 0; i < this.hb_ghost.length; i++) {
-            let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
-            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
+          for (let i = 0; i < this.hb_solid.length; i++) {
+            let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
+            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
           }
           this.angle -= this.angular_speed;
         }
-      }
-
-      for (let i = 0; i < this.hb_ghost.length; i++) { // adjust angle of hb_solid to angle of hb_ghost
-        this.hb_solid[i] = [this.hb_ghost[i][0] + this.pivot[0], this.hb_ghost[i][1] + this.pivot[1], this.hb_ghost[i][2]];
       }
     }
 

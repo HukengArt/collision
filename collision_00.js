@@ -72,9 +72,9 @@ function polygonCollision(list0, list1) {
             let vec3 = [line1[0][0] - line0[1][0], line1[0][1] - line0[1][1]];
 
             if (vecAngle2D(vec0, vec1) +
-                vecAngle2D([-vec0[0], -vec0[1]], [-vec3[0], -vec3[1]]) +
+                vecAngle2D([-1*vec0[0], -1*vec0[1]], [-1*vec3[0], -1*vec3[1]]) +
                 vecAngle2D(vec2, vec3) +
-                vecAngle2D([-vec1[0], -vec1[1]], [-vec2[0], -vec2[1]]) >=
+                vecAngle2D([-1*vec1[0], -1*vec1[1]], [-1*vec2[0], -1*vec2[1]]) >=
                 2 * Math.PI * 0.9999) {
                 return true;
             }
