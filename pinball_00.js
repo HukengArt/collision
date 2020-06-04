@@ -307,13 +307,13 @@ class Flipper {
           if (this.ccw) {
             for (let i = 0; i < this.hb_solid.length; i++) {
               let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
-              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
             }
             this.angle += this.angular_speed;
           } else {
             for (let i = 0; i < this.hb_solid.length; i++) {
               let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
-              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
             }
             this.angle += this.angular_speed;
           }
@@ -322,13 +322,13 @@ class Flipper {
         if (this.ccw) {
           for (let i = 0; i < this.hb_solid.length; i++) {
             let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
-            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
           }
           this.angle -= this.angular_speed;
         } else {
           for (let i = 0; i < this.hb_solid.length; i++) {
             let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
-            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
           }
           this.angle -= this.angular_speed;
         }
