@@ -13,15 +13,21 @@ var canvas;
 var ctx;
 var keys = [];
 var t_vel = 9;
-var grav = 1;
+var grav = 9.81;
 var fric;
 
 var ball;
 var solid_elements = [];
 var flippers = [];
 
+//how many updates happen per frame
+const timeResolution = 1000;
+//scales the acceleration.
+const acceleration_scale = 0.005;
+
+
 document.addEventListener('DOMContentLoaded', setup);
-setInterval(update, 1000/FPS);
+setInterval(update, timeResolution/FPS);
 
 function setup() {
     canvas = document.getElementById('display');
@@ -137,12 +143,12 @@ function update() {
       solid_elements[i].drawHbSolid();
     }
 
-    ball.move();
+    ball.move(timeResolution/FPS);
     ball.drawHbSolid();
 
     if (ball.pos[1] > HEIGHT) {
       ball = new Ball([WIDTH/2, HEIGHT/2],
-                      [Math.floor(Math.random() * 15) - 7, Math.floor(Math.random() * 15) - 7]);
+                      [Math.floor(Math.random() * 30) - 7, Math.floor(Math.random() * 30) - 7]);
     }
 }
 
@@ -167,10 +173,14 @@ class Ball {
         this.elasticity = 0.8; // fraction of movement speed retained after bounce
         this.mass = 0.09;
         this.bounce_lock = 0; // counter to prevent 'flicker-bounce'
-
     }
 
-    move() {
+    /**
+    * @function move
+    * @desc method that moves the ball. is called once per update
+    * @param {number} elapsedTime elapsed time since the last update
+    */
+    move(elapsedTime) {
         // manage bounce lock
         if (this.bounce_lock > 0) {
           this.bounce_lock += 1;
@@ -191,7 +201,9 @@ class Ball {
 
         // apply gravity
         if (grav) {
-            this.mo_vec[1] += this.mass * grav;
+            //multiplier before elapsedTime tweaks the gravity acceleration
+            this.mo_vec[1] += grav * (acceleration_scale*elapsedTime);
+            console.log(this.mo_vec)
         }
 
         // apply friction
