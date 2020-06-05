@@ -10,7 +10,7 @@ const HEIGHT = 800;
 const FPS = 60;
 
 //"air density" used to model the drag
-const AIR_DENSITY = 1;
+const AIR_DENSITY = 2;
 
 var canvas;
 var ctx;
@@ -198,18 +198,15 @@ class Ball {
         // (reference area is 1. this is a sphere and it doesn't need to be so complex)
         var oldVel = vecLen2D(this.mo_vec);
         var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
-        //decellaration
-        var decel = dragForce/this.mass;
-        // TODO: calcuate new velocity vector Length
-        // TODO: check for the difference between old and new_point
-        // TODO: multiply vel_dimensions by the new vel factor
+        //decelarration
+        var decel = dragForce/1; //technically it should divide by mass, but it gets weird like that
+        var newVel = oldVel - (decel*(acceleration_scale*elapsedTime));
+        var decelFactor = newVel/oldVel;
 
-        /*
-        if (t_vel && vecLen2D(this.mo_vec) > t_vel) {
-            this.mo_vec[0] = this.mo_vec[0] / vecLen2D(this.mo_vec) * t_vel;
-            this.mo_vec[1] = this.mo_vec[1] / vecLen2D(this.mo_vec) * t_vel;
-        }
-        */
+        this.mo_vec[0] *= decelFactor;
+        this.mo_vec[1] *= decelFactor;
+
+
 
         // move orb
         this.pos[0] += this.mo_vec[0];
