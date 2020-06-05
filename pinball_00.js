@@ -9,11 +9,14 @@ const WIDTH = 500;
 const HEIGHT = 800;
 const FPS = 60;
 
+//"air density" used to model the drag
+const AIR_DENSITY = 1;
+
 var canvas;
 var ctx;
 var keys = [];
 var t_vel = 9;
-var grav = 1;
+var grav = 0.1;
 var fric;
 
 var ball;
@@ -160,14 +163,14 @@ function vecRotate2D(vec, angle) {
 }
 
 class Ball {
-    constructor(pos, mo_vec) {
+    constructor(pos, mo_vec, drag_coef) {
         this.pos = pos;
         this.hb_solid_rad = 10;
         this.mo_vec = mo_vec;
         this.elasticity = 0.8; // fraction of movement speed retained after bounce
         this.mass = 0.09;
         this.bounce_lock = 0; // counter to prevent 'flicker-bounce'
-
+        this.drag_coefficient = drag_coef || 0.5; //default to 0.5 if drag_coef undefined
     }
 
     move() {
@@ -179,11 +182,23 @@ class Ball {
           }
         }
 
-        // adjust speed to terminal velocity
+        // adjust speed to terminal velocity. use drag equation
+        // https://en.wikipedia.org/wiki/Drag_equation
+        // (reference area is 1. this is a sphere and it doesn't need to be so complex)
+        var oldVel = vecLen2D(this.mo_vec);
+        var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
+        //decellaration
+        var decel = dragForce/this.mass;
+        // TODO: calcuate new velocity vector Length
+        // TODO: check for the difference between old and new_point
+        // TODO: multiply vel_dimensions by the new vel factor
+
+        /*
         if (t_vel && vecLen2D(this.mo_vec) > t_vel) {
             this.mo_vec[0] = this.mo_vec[0] / vecLen2D(this.mo_vec) * t_vel;
             this.mo_vec[1] = this.mo_vec[1] / vecLen2D(this.mo_vec) * t_vel;
         }
+        */
 
         // move orb
         this.pos[0] += this.mo_vec[0];
@@ -191,7 +206,7 @@ class Ball {
 
         // apply gravity
         if (grav) {
-            this.mo_vec[1] += this.mass * grav;
+            this.mo_vec[1] += grav;
         }
 
         // apply friction
