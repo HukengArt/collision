@@ -7,21 +7,52 @@
 
 const WIDTH = 500;
 const HEIGHT = 800;
-const FPS = 60;
+
+//"air density" used to model the drag
+const AIR_DENSITY = 1.5;
+//the scale of the world. influences acceleration.
+const WORLD_SCALE = 0.005;
 
 var canvas;
 var ctx;
 var keys = [];
-var t_vel = 10;
-var grav = 1;
+var t_vel = 9;
+var grav = 9.81;
 var fric;
 
 var ball;
 var solid_elements = [];
 var flippers = [];
 
+/**
+* @Object mainLoop
+* @desc Object that contains references to the main-interval.
+* also conatins parameters for the fps and time resolution.
+*/
+const mainLoop = {
+  LoopId : false,
+  running : false,
+  //how many updates happen per frame
+  timeResolution : 1000,
+  fps : 60,
+
+  /**
+  * method to toggle the loop.
+  * @memberof mainLoop
+  * @method toggle
+  */
+  toggle: function(){
+    if(this.running){
+      clearInterval(this.LoopId);
+    } else {
+      //if no loop is running, make a new one
+      this.LoopId = setInterval(update, this.timeResolution/this.fps);
+    }
+    this.running = !this.running;
+  }
+};
+
 document.addEventListener('DOMContentLoaded', setup);
-setInterval(update, 1000/FPS);
 
 function setup() {
     canvas = document.getElementById('display');
@@ -43,7 +74,6 @@ function setup() {
     ball = new Ball([WIDTH/2, HEIGHT/2],
                     [Math.floor(Math.random() * 15) - 7, Math.floor(Math.random() * 15) - 7]);
     solid_elements = [
-      // table outline
       new SolidElement([[50,150,1],
                         [25,250,1],
                         [50,350,1],
@@ -51,6 +81,10 @@ function setup() {
                         [75,650,1],
                         [170,700,1],
                         [170,875,1],
+                        // [0,875,1],
+                        // [0,0,1],
+                        // [500,0,1],
+                        // [500,875,1],
                         [330,875,1],
                         [330,700,1],
                         [425,650,1],
@@ -59,8 +93,7 @@ function setup() {
                         [475,250,1],
                         [450,150,1],
                         [350,50,1],
-                        [250,25,1],
-                        [150,50,1]]),
+                        [250,25,1]]),
 
       // side bumpers
       new SolidElement([[150,450,1],
@@ -109,6 +142,9 @@ function setup() {
                    [-60,10,-1]],
                    Math.PI*30/180, Math.PI/2, 74, false)
     ];
+
+    //start the Loop
+    mainLoop.toggle();
 }
 
 function update() {
@@ -135,50 +171,55 @@ function update() {
       solid_elements[i].drawHbSolid();
     }
 
-    ball.move();
+    ball.move(mainLoop.timeResolution/mainLoop.fps);
     ball.drawHbSolid();
 
     if (ball.pos[1] > HEIGHT) {
       ball = new Ball([WIDTH/2, HEIGHT/2],
-                      [Math.floor(Math.random() * 15) - 7, Math.floor(Math.random() * 15) - 7]);
+                      [Math.floor(Math.random() * 30) - 7, Math.floor(Math.random() * 30) - 7]);
     }
 }
 
 function vecAngle2D(vec_a, vec_b) {
-    // return smaller angle between two 2D vectors (in radians)
     return Math.acos((vec_a[0] * vec_b[0] + vec_a[1] * vec_b[1]) / (Math.sqrt(Math.pow(vec_a[0], 2) + Math.pow(vec_a[1], 2)) * Math.sqrt(Math.pow(vec_b[0], 2) + Math.pow(vec_b[1], 2))));
   }
 
 function vecLen2D(vec) {
-  // return length of a 2D vector
   return Math.sqrt(Math.pow(vec[0],2) + Math.pow(vec[1],2));
 }
 
 function vecRotate2D(vec, angle) {
-  // rotate a 2D vector or point by angle (in radians) around zero
-  let new_x = vec[0] * Math.cos(angle) - vec[1] * Math.sin(angle);
-  let new_y = vec[0] * Math.sin(angle) + vec[1] * Math.cos(angle);
-  vec[0] = new_x;
-  vec[1] = new_y;
-  return vec;
+  return [vec[0] * Math.cos(angle) - vec[1] * Math.sin(angle),
+          vec[0] * Math.sin(angle) + vec[1] * Math.cos(angle)];
 }
 
 class Ball {
-    constructor(pos, mo_vec) {
-        this.pos = pos; // center of ball
-        this.hb_solid_rad = 12;
+    constructor(pos, mo_vec, drag_coef, mass) {
+        this.pos = pos;
+        this.hb_solid_rad = 10;
         this.mo_vec = mo_vec;
         this.elasticity = 0.8; // fraction of movement speed retained after bounce
-        this.mass = 0.1;
+        this.mass = mass || 1;
+        this.bounce_lock = 0; // counter to prevent 'flicker-bounce'
+        this.drag_coefficient = drag_coef || 0.5; //default to 0.5 if drag_coef undefined
     }
 
-    move() {
-
-        // adjust speed to terminal velocity
-        if (t_vel && vecLen2D(this.mo_vec) > t_vel) {
-            this.mo_vec[0] = this.mo_vec[0] / vecLen2D(this.mo_vec) * t_vel;
-            this.mo_vec[1] = this.mo_vec[1] / vecLen2D(this.mo_vec) * t_vel;
+    /**
+    * @function move
+    * @desc method that moves the ball. is called once per update
+    * @param {number} elapsedTime elapsed time since the last update
+    */
+    move(elapsedTime) {
+        // manage bounce lock
+        if (this.bounce_lock > 0) {
+          this.bounce_lock += 1;
+          if (this.bounce_lock > 3) {
+            this.bounce_lock = 0;
+          }
         }
+
+        // adjust speed to terminal velocity.
+        this.drag(elapsedTime);
 
         // move orb
         this.pos[0] += this.mo_vec[0];
@@ -186,7 +227,8 @@ class Ball {
 
         // apply gravity
         if (grav) {
-            this.mo_vec[1] += this.mass * grav;
+            //multiplier before elapsedTime tweaks the gravity acceleration
+            this.mo_vec[1] += grav * WORLD_SCALE * elapsedTime;
         }
 
         // apply friction
@@ -196,41 +238,55 @@ class Ball {
         }
     }
 
+    /**
+    * @function drag
+    * @desc Simulates aerodynamic drag on ball.
+    * uses drag equation: https://en.wikipedia.org/wiki/Drag_equation
+    * (reference area is 1. this is a sphere and it doesn't need to be so complex)
+    */
+    drag(elapsedTime){
+      var oldVel = vecLen2D(this.mo_vec);
+      var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
+      //deceleration, F=m*a <=> a=F/m
+      var decel = dragForce/this.mass;
+      //calculate new velocity by decelarating
+      var newVel = oldVel - (decel*WORLD_SCALE*elapsedTime);
+      //get factor of decelaration, and scale the motion vectors accordingly
+      var decelFactor = newVel/oldVel;
+      this.mo_vec[0] *= decelFactor;
+      this.mo_vec[1] *= decelFactor;
+    }
+
     bounce(hitbox) {
+      if (this.bounce_lock == 0) {
 
-      for (let i = 0; i < hitbox.length; i++) {
-        let vec_a = [this.pos[0] - hitbox[i][0], // vector between vertex and ball
-                    this.pos[1] - hitbox[i][1]];
-        let vec_b = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0], //vector between vertex and next vertex
-                    hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
+        for (let i = 0; i < hitbox.length; i++) {
+          let vec_a = [this.pos[0] - hitbox[i][0],
+                      this.pos[1] - hitbox[i][1]];
+          let vec_b = [hitbox[(i + 1) % hitbox.length][0] - hitbox[i][0],
+                      hitbox[(i + 1) % hitbox.length][1] - hitbox[i][1]];
 
-        let radians_a = vecAngle2D(vec_a, vec_b);
+          let radians_a = vecAngle2D(vec_a, vec_b);
 
-        // collision detection
-        if (radians_a <= Math.PI * 0.5 &&
-            vecLen2D(vec_a) <= vecLen2D(vec_b) + this.hb_solid_rad && // distance of ball from vertex is shorter than length of side
-            vecLen2D(vec_a) * Math.sin(radians_a) <= this.hb_solid_rad && // ball is closer to side of hitbox than its own radius
-            vecAngle2D(this.mo_vec, [-1 * vec_b[1], vec_b[0]]) <= Math.PI * 0.5) { // ball is not already moving away from hitbox
+          if (radians_a <= Math.PI * 0.5 &&
+              vecLen2D(vec_a) <= vecLen2D(vec_b) &&
+              vecLen2D(vec_a) * Math.sin(radians_a) <= this.hb_solid_rad &&
+              vecAngle2D(this.mo_vec, [-vec_b[1],vec_b[0]]) <= Math.PI * 0.5) {
 
-          let alpha = vecAngle2D(this.mo_vec, vec_b);
+              let alpha = vecAngle2D(this.mo_vec, vec_b);
 
-          // move ball out of hitbox !!!WORK IN PROGRESS!!!
-          // let overlap = this.hb_solid_rad - vecLen2D(vec_a) * Math.sin(radians_a);
-          // this.pos = [this.pos[0] - this.mo_vec[0] / vecLen2D(this.mo_vec) * overlap * Math.sin(alpha),
-          //             this.pos[1] - this.mo_vec[1] / vecLen2D(this.mo_vec) * overlap * Math.sin(alpha)];
-
-          if (hitbox[i][2] > 0) { // normal bounce
-            let mo_vec_new = vecRotate2D(this.mo_vec, 2 * Math.PI - 2 * alpha);
-            this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
-                           mo_vec_new[1] * this.elasticity * hitbox[i][2]];
-          } else if (hitbox[i][2] < 0) { // perpedicular bounce
-            this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]),
-                           vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2]];
-          } else {} // inactive vertex
-
-
-          ctx.strokeStyle = 'red';
-          return true;
+              if (hitbox[i][2] > 0) {
+                let mo_vec_new = vecRotate2D(this.mo_vec, 2 * Math.PI - 2 * alpha);
+                this.mo_vec = [mo_vec_new[0] * this.elasticity * hitbox[i][2],
+                               mo_vec_new[1] * this.elasticity * hitbox[i][2]];
+              } else {
+                this.mo_vec = [vec_b[1] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * Math.abs(hitbox[i][2]),
+                               vec_b[0] / vecLen2D(vec_b) * vecLen2D(this.mo_vec) * hitbox[i][2]];
+              }
+              ctx.strokeStyle = 'red';
+              this.bounce_lock = 1;
+              return true;
+          }
         }
       }
     }
@@ -254,84 +310,85 @@ class Flipper {
       this.max_angle = max_angle;
       this.ccw = ccw;
 
-      this.hb_solid = outline;
-      if (this.ccw) { // adjust hb_ghost to actual starting position
-        for (let i = 0; i < this.hb_solid.length; i++) {
-          let new_point = vecRotate2D(this.hb_solid[i], this.min_angle);
-          this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+      this.hb_ghost = outline;
+      if (this.ccw) {
+        for (let i = 0; i < this.hb_ghost.length; i++) {
+          let new_point = vecRotate2D(this.hb_ghost[i], this.min_angle);
+          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
         }
       } else {
-        for (let i = 0; i < this.hb_solid.length; i++) {
-          let new_point = vecRotate2D(this.hb_solid[i], 2*Math.PI - this.min_angle);
-          this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], new_point[2]];
+        for (let i = 0; i < this.hb_ghost.length; i++) {
+          let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.min_angle);
+          this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
         }
       }
 
+      this.hb_solid = [];
+      for (let i = 0; i < this.hb_ghost.length; i++) {
+        this.hb_solid.push([this.hb_ghost[i][0] + this.pivot[0], this.hb_ghost[i][1] + this.pivot[1], this.hb_ghost[2]]);
+      }
+
       this.active = false;
+      this.convex = true;
       this.angular_speed = Math.PI * 10/180;
     }
 
     control() {
       if (keys[this.key_code]) {
-        this.active = true; // flipper moves up or rests in max_angle position
+        this.active = true;
         if (this.angle < this.max_angle) {
-          this.hb_solid[0][2] = -10;
-          this.hb_solid[1][2] = -10;
-          this.hb_solid[2][2] = -10;
-          this.hb_solid[3][2] = 0;
-          this.hb_solid[5][2] = 0;
-          this.hb_solid[5][2] = 0;
+          this.hb_ghost[0][2] = -6;
+          this.hb_ghost[1][2] = -6;
+          this.hb_ghost[2][2] = -6;
         } else {
-          this.hb_solid[0][2] = 1;
-          this.hb_solid[1][2] = 1;
-          this.hb_solid[2][2] = 1;
-          this.hb_solid[3][2] = 1;
-          this.hb_solid[5][2] = 1;
-          this.hb_solid[5][2] = 1;
+          this.hb_ghost[0][2] = 1;
+          this.hb_ghost[1][2] = 1;
+          this.hb_ghost[2][2] = 1;
         }
       } else {
-        this.active = false; // flipper moves down or rests in min_angle position
-        this.hb_solid[0][2] = 1;
-        this.hb_solid[1][2] = 1;
-        this.hb_solid[2][2] = 1;
-        this.hb_solid[3][2] = 1;
-        this.hb_solid[5][2] = 1;
-        this.hb_solid[5][2] = 1;
+        this.active = false;
+        this.hb_ghost[0][2] = 1;
+        this.hb_ghost[1][2] = 1;
+        this.hb_ghost[2][2] = 1;
       }
     }
 
     move() {
 
       if (this.active) {
-        if (this.angle <= this.max_angle) { // flipper moves up
+        if (this.angle <= this.max_angle) {
           if (this.ccw) {
-            for (let i = 0; i < this.hb_solid.length; i++) {
-              let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
-              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
+            for (let i = 0; i < this.hb_ghost.length; i++) {
+              let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
+              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
             }
             this.angle += this.angular_speed;
           } else {
-            for (let i = 0; i < this.hb_solid.length; i++) {
-              let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
-              this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
+            for (let i = 0; i < this.hb_ghost.length; i++) {
+              let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
+              this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
             }
             this.angle += this.angular_speed;
           }
         }
-      } else if (this.angle > 0) { // flipper moves down
+      } else if (this.angle > 0) {
         if (this.ccw) {
-          for (let i = 0; i < this.hb_solid.length; i++) {
-            let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], this.angular_speed);
-            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
+          for (let i = 0; i < this.hb_ghost.length; i++) {
+            let new_point = vecRotate2D(this.hb_ghost[i], this.angular_speed);
+            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
           }
           this.angle -= this.angular_speed;
         } else {
-          for (let i = 0; i < this.hb_solid.length; i++) {
-            let new_point = vecRotate2D([this.hb_solid[i][0] - this.pivot[0],this.hb_solid[i][1] - this.pivot[1]], 2*Math.PI - this.angular_speed);
-            this.hb_solid[i] = [new_point[0] + this.pivot[0], new_point[1] + this.pivot[1], this.hb_solid[i][2]];
+          for (let i = 0; i < this.hb_ghost.length; i++) {
+            let new_point = vecRotate2D(this.hb_ghost[i], 2*Math.PI - this.angular_speed);
+            this.hb_ghost[i] = [new_point[0], new_point[1], this.hb_ghost[i][2]];
           }
           this.angle -= this.angular_speed;
         }
+      }
+
+      for (let i = 0; i < this.hb_ghost.length; i++) {
+        this.hb_solid[i] = [this.hb_ghost[i][0] + this.pivot[0], this.hb_ghost[i][1] + this.pivot[1], this.hb_ghost[i][2]];
       }
     }
 
