@@ -9,7 +9,7 @@ const WIDTH = 500;
 const HEIGHT = 800;
 
 //"air density" used to model the drag
-const AIR_DENSITY = 1;
+const AIR_DENSITY = 1.5;
 //the scale of the world. influences acceleration.
 const WORLD_SCALE = 0.005;
 
@@ -219,7 +219,7 @@ class Ball {
         }
 
         // adjust speed to terminal velocity.
-        this.drag();
+        this.drag(elapsedTime);
 
         // move orb
         this.pos[0] += this.mo_vec[0];
@@ -244,7 +244,7 @@ class Ball {
     * uses drag equation: https://en.wikipedia.org/wiki/Drag_equation
     * (reference area is 1. this is a sphere and it doesn't need to be so complex)
     */
-    drag(){
+    drag(elapsedTime){
       var oldVel = vecLen2D(this.mo_vec);
       var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
       //deceleration, F=m*a <=> a=F/m
