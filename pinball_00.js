@@ -7,7 +7,6 @@
 
 const WIDTH = 500;
 const HEIGHT = 800;
-const FPS = 60;
 
 //"air density" used to model the drag
 const AIR_DENSITY = 2;
@@ -23,14 +22,30 @@ var ball;
 var solid_elements = [];
 var flippers = [];
 
-//how many updates happen per frame
-const timeResolution = 1000;
+
 //scales the acceleration.
 const acceleration_scale = 0.005;
 
+//initialise the main loop
+const mainLoop = {
+  LoopId : false,
+  running : false,
+  //how many updates happen per frame
+  timeResolution : 1000,
+  fps : 60,
+
+
+  toggle: function(){
+    if(this.running){
+      clearInterval(this.LoopId);
+    } else {
+      this.LoopId = setInterval(update, this.timeResolution/this.fps);
+    }
+    this.running = !this.running;
+  }
+};
 
 document.addEventListener('DOMContentLoaded', setup);
-setInterval(update, timeResolution/FPS);
 
 function setup() {
     canvas = document.getElementById('display');
@@ -120,6 +135,9 @@ function setup() {
                    [-60,10,-1]],
                    Math.PI*30/180, Math.PI/2, 74, false)
     ];
+
+    //start the Loop
+    mainLoop.toggle();
 }
 
 function update() {
@@ -146,7 +164,7 @@ function update() {
       solid_elements[i].drawHbSolid();
     }
 
-    ball.move(timeResolution/FPS);
+    ball.move(mainLoop.timeResolution/mainLoop.fps);
     ball.drawHbSolid();
 
     if (ball.pos[1] > HEIGHT) {
@@ -196,13 +214,13 @@ class Ball {
         // adjust speed to terminal velocity. use drag equation
         // https://en.wikipedia.org/wiki/Drag_equation
         // (reference area is 1. this is a sphere and it doesn't need to be so complex)
+        //TODO: clean up, refactor into function with easier-to-control parameters
         var oldVel = vecLen2D(this.mo_vec);
         var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
-        //decelarration
+        //decelarr  ation
         var decel = dragForce/1; //technically it should divide by mass, but it gets weird like that
         var newVel = oldVel - (decel*(acceleration_scale*elapsedTime));
         var decelFactor = newVel/oldVel;
-
         this.mo_vec[0] *= decelFactor;
         this.mo_vec[1] *= decelFactor;
 
