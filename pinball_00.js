@@ -9,7 +9,9 @@ const WIDTH = 500;
 const HEIGHT = 800;
 
 //"air density" used to model the drag
-const AIR_DENSITY = 2;
+const AIR_DENSITY = 1;
+//the scale of the world. influences acceleration.
+const WORLD_SCALE = 0.005;
 
 var canvas;
 var ctx;
@@ -21,10 +23,6 @@ var fric;
 var ball;
 var solid_elements = [];
 var flippers = [];
-
-
-//scales the acceleration.
-const acceleration_scale = 0.005;
 
 /**
 * @Object mainLoop
@@ -196,12 +194,12 @@ function vecRotate2D(vec, angle) {
 }
 
 class Ball {
-    constructor(pos, mo_vec, drag_coef) {
+    constructor(pos, mo_vec, drag_coef, mass) {
         this.pos = pos;
         this.hb_solid_rad = 10;
         this.mo_vec = mo_vec;
         this.elasticity = 0.8; // fraction of movement speed retained after bounce
-        this.mass = 0.09;
+        this.mass = mass || 1;
         this.bounce_lock = 0; // counter to prevent 'flicker-bounce'
         this.drag_coefficient = drag_coef || 0.5; //default to 0.5 if drag_coef undefined
     }
@@ -220,20 +218,8 @@ class Ball {
           }
         }
 
-        // adjust speed to terminal velocity. use drag equation
-        // https://en.wikipedia.org/wiki/Drag_equation
-        // (reference area is 1. this is a sphere and it doesn't need to be so complex)
-        //TODO: clean up, refactor into function with easier-to-control parameters
-        var oldVel = vecLen2D(this.mo_vec);
-        var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
-        //decelarr  ation
-        var decel = dragForce/1; //technically it should divide by mass, but it gets weird like that
-        var newVel = oldVel - (decel*(acceleration_scale*elapsedTime));
-        var decelFactor = newVel/oldVel;
-        this.mo_vec[0] *= decelFactor;
-        this.mo_vec[1] *= decelFactor;
-
-
+        // adjust speed to terminal velocity.
+        drag();
 
         // move orb
         this.pos[0] += this.mo_vec[0];
@@ -242,7 +228,7 @@ class Ball {
         // apply gravity
         if (grav) {
             //multiplier before elapsedTime tweaks the gravity acceleration
-            this.mo_vec[1] += grav * (acceleration_scale*elapsedTime);
+            this.mo_vec[1] += grav * WORLD_SCALE * elapsedTime;
         }
 
         // apply friction
@@ -250,6 +236,25 @@ class Ball {
             this.mo_vec[0] *= fric;
             this.mo_vec[1] *= fric;
         }
+    }
+
+    /**
+    * @function drag
+    * @desc Simulates aerodynamic drag on ball.
+    * uses drag equation: https://en.wikipedia.org/wiki/Drag_equation
+    * (reference area is 1. this is a sphere and it doesn't need to be so complex)
+    */
+    drag(){
+      var oldVel = vecLen2D(this.mo_vec);
+      var dragForce = (1/2)*AIR_DENSITY*oldVel^2*this.drag_coefficient;
+      //deceleration, F=m*a <=> a=F/m
+      var decel = dragForce/this.mass;
+      //calculate new velocity by decelarating
+      var newVel = oldVel - (decel*WORLD_SCALE*elapsedTime);
+      //get factor of decelaration, and scale the motion vectors accordingly
+      var decelFactor = newVel/oldVel;
+      this.mo_vec[0] *= decelFactor;
+      this.mo_vec[1] *= decelFactor;
     }
 
     bounce(hitbox) {
