@@ -26,7 +26,11 @@ var flippers = [];
 //scales the acceleration.
 const acceleration_scale = 0.005;
 
-//initialise the main loop
+/**
+* @Object mainLoop
+* @desc Object that contains references to the main-interval.
+* also conatins parameters for the fps and time resolution.
+*/
 const mainLoop = {
   LoopId : false,
   running : false,
@@ -34,11 +38,16 @@ const mainLoop = {
   timeResolution : 1000,
   fps : 60,
 
-
+  /**
+  * method to toggle the loop.
+  * @memberof mainLoop
+  * @method toggle
+  */
   toggle: function(){
     if(this.running){
       clearInterval(this.LoopId);
     } else {
+      //if no loop is running, make a new one
       this.LoopId = setInterval(update, this.timeResolution/this.fps);
     }
     this.running = !this.running;
