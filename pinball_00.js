@@ -219,7 +219,7 @@ class Ball {
         }
 
         // adjust speed to terminal velocity.
-        drag();
+        this.drag();
 
         // move orb
         this.pos[0] += this.mo_vec[0];
